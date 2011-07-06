@@ -1,0 +1,88 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
+{\fonttbl\f0\fnil\fcharset0 Monaco;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;\red191\green0\blue0;\red0\green0\blue191;
+\red96\green96\blue96;\red0\green115\blue0;\red0\green0\blue191;\red0\green115\blue0;\red13\green23\blue173;
+\red15\green29\blue171;}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+
+\f0\fs18 \cf2 ( \cf3 // init the connection\cf2 \
+	\cf4 SerialPort\cf2 .devicePattern = \cf5 "/dev/tty.RN42*"\cf2 ;\
+\cf3 //	SerialPort.devicePattern = "/dev/tty.usb*";\cf2 \
+	p = \cf4 SerialPort\cf2 (\cf4 SerialPort\cf2 .devices[0], 115200, crtscts: \cf4 true\cf2 );\
+	\
+\pard\pardeftab560\ql\qnatural
+\cf2 	\cf4 SynthDef\cf2 (\cf6 \\box\cf2 , \{\cf4 | out = 0, ax = 0, ay = 0, az = 0 |\
+		var tempo = 0.5;\
+		var pitchFactor = ay.linlin(0,360,1, 3);\
+		var variance = \cf7 ay.linlin(0,360,0.5, 1.5);\cf4 \
+		\cf0 x=SinOsc;\
+		y=LFNoise0;\
+		a=y.ar(tempo*8);\cf2 \
+		\cf4 Out\cf2 .ar(out, \
+			x.ar(Pulse.ar(tempo)*24)\
+			+ x.ar(90*pitchFactor+(a*90*variance))\
+//			+ MoogFF.ar(Saw.ar(y.ar(4,333,666)),a*XLine.ar(1,39,99,99,0,2))\
+			)!2 / 3	\
+	\}).send(s);\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+\cf2 \
+\pard\pardeftab560\ql\qnatural
+\cf0 	\cf7 SynthDef\cf0 (\cf8 \\ping\cf0 , \{\cf7 | out = 0, gate = 1 |\cf0 \
+		\cf7 Out\cf0 .ar(out, \
+			\cf9 EnvGen\cf0 .kr(\cf10 Env\cf0 .perc(0.001, 1, 1, -4), gate, doneAction:2 ) * \cf7 SinOsc\cf0 .ar(800, pi/2, 0.3);\
+		)	\
+	\}).send(s);\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural\pardirnatural
+\cf2 	\
+)\
+\
+a.free\
+\cf0 a = \cf7 Synth\cf0 (\cf8 \\box\cf0 );\cf2 \
+a.setn(\\ax, [0,200,0])\
+\
+( \cf3 // start the thread to read the data from LeBox	\cf2 \
+	a = \cf4 Synth\cf2 (\cf6 \\box\cf2 );\
+	t = fork \{ \
+		\cf4 var\cf2  val, acc, byte;\
+		loop \{\
+			if (p.read == $D.ascii) \{\
+				p.read.switch (\
+					$K.ascii, \{ postln(\cf5 "Knock!"\cf2 ); Synth(\\ping); \},\
+					$A.ascii, \{\
+						acc = [0,0,0];	\
+						for (0,2, \{ \cf4 arg\cf2  i;\
+							val = \cf5 ""\cf2 ;\
+							while (\{(byte=p.read) != $,.ascii\},\{\
+								val = val ++ byte.asAscii;\
+							\});\
+							acc[i] = val.asInteger;\
+						\});\
+						a.setn(\\ax, acc);\
+						acc.postln;\
+					\},\
+					\{ postln(\cf5 "Unrecognised data"\cf2 ); \}\
+				)\
+			\};\
+		\};\
+	\};\
+)\
+\
+( \cf3 // start the thread to read the data from LeBox	\cf2 \
+	t = fork \{ \
+		loop \{\
+			p.read.asAscii.post;\
+		\};\
+	\};\
+)\
+\
+\cf0 t.stop\
+\cf2 a.free\
+\pard\pardeftab560\ql\qnatural
+\cf2 p.close\
+\
+\cf4 SerialPort\cf2 .closeAll;\
+\
+b.getToFloatArray(wait:0.01,action:\{\cf4 arg\cf2  array; a = array; \{a.plot;\}.defer;\cf5 "done"\cf2 .postln;\});\
+\
+\cf4 SCFreqScopeWindow\cf2 .new(600, 400, 0);\
+}
